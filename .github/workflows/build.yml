@@ -1,0 +1,39 @@
+name: Build Pop!_OS arm64 rootfs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 20 1 * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap qemu-user-static binfmt-support \
+            gnupg systemd-container
+
+      - name: Enable arm64 binfmt
+        run: sudo update-binfmts --enable qemu-aarch64
+
+      - name: Build rootfs
+        run: sudo bash build-rootfs.sh
+
+      - name: Pack rootfs
+        run: sudo tar -cJf popos-arm64-rootfs.tar.xz -C rootfs .
+
+      - name: Generate proot-distro plugin
+        run: bash generate-plugin.sh ${{ github.run_number }}
+
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: popos-arm64-${{ github.run_number }}
+          files: |
+            popos-arm64-rootfs.tar.xz
+            popos.sh
